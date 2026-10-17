@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2020 the original author or authors.
+/*
+ *    Copyright 2009-2026 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,13 @@
  */
 package org.apache.ibatis.type;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.net.URI;
 import java.sql.CallableStatement;
 import java.sql.PreparedStatement;
@@ -45,7 +50,7 @@ class TypeHandlerRegistryTest {
 
   @Test
   void shouldRegisterAndRetrieveTypeHandler() {
-    TypeHandler<String> stringTypeHandler = typeHandlerRegistry.getTypeHandler(String.class);
+    TypeHandler<?> stringTypeHandler = typeHandlerRegistry.getTypeHandler(String.class);
     typeHandlerRegistry.register(String.class, JdbcType.LONGVARCHAR, stringTypeHandler);
     assertEquals(stringTypeHandler, typeHandlerRegistry.getTypeHandler(String.class, JdbcType.LONGVARCHAR));
 
@@ -53,12 +58,11 @@ class TypeHandlerRegistryTest {
     assertFalse(typeHandlerRegistry.hasTypeHandler(RichType.class));
     assertTrue(typeHandlerRegistry.hasTypeHandler(String.class, JdbcType.LONGVARCHAR));
     assertTrue(typeHandlerRegistry.hasTypeHandler(String.class, JdbcType.INTEGER));
-    assertTrue(typeHandlerRegistry.getUnknownTypeHandler() instanceof UnknownTypeHandler);
   }
 
   @Test
   void shouldRegisterAndRetrieveComplexTypeHandler() {
-    TypeHandler<List<URI>> fakeHandler = new TypeHandler<List<URI>>() {
+    TypeHandler<List<URI>> fakeHandler = new TypeHandler<>() {
 
       @Override
       public void setParameter(PreparedStatement ps, int i, List<URI> parameter, JdbcType jdbcType) {
@@ -85,7 +89,8 @@ class TypeHandlerRegistryTest {
 
     };
 
-    TypeReference<List<URI>> type = new TypeReference<List<URI>>(){};
+    TypeReference<List<URI>> type = new TypeReference<>() {
+    };
 
     typeHandlerRegistry.register(type, fakeHandler);
     assertSame(fakeHandler, typeHandlerRegistry.getTypeHandler(type));
@@ -93,7 +98,7 @@ class TypeHandlerRegistryTest {
 
   @Test
   void shouldAutoRegisterAndRetrieveComplexTypeHandler() {
-    TypeHandler<List<URI>> fakeHandler = new BaseTypeHandler<List<URI>>() {
+    TypeHandler<List<URI>> fakeHandler = new BaseTypeHandler<>() {
 
       @Override
       public void setNonNullParameter(PreparedStatement ps, int i, List<URI> parameter, JdbcType jdbcType) {
@@ -122,11 +127,12 @@ class TypeHandlerRegistryTest {
 
     typeHandlerRegistry.register(fakeHandler);
 
-    assertSame(fakeHandler, typeHandlerRegistry.getTypeHandler(new TypeReference<List<URI>>(){}));
+    assertSame(fakeHandler, typeHandlerRegistry.getTypeHandler(new TypeReference<List<URI>>() {
+    }));
   }
 
   @Test
-  void shouldBindHandlersToWrapersAndPrimitivesIndividually() {
+  void shouldBindHandlersToWrappersAndPrimitivesIndividually() {
     typeHandlerRegistry.register(Integer.class, DateTypeHandler.class);
     assertSame(IntegerTypeHandler.class, typeHandlerRegistry.getTypeHandler(int.class).getClass());
     typeHandlerRegistry.register(Integer.class, IntegerTypeHandler.class);
@@ -180,6 +186,10 @@ class TypeHandlerRegistryTest {
 
   @MappedTypes(SomeInterface.class)
   public static class SomeInterfaceTypeHandler<E extends Enum<E> & SomeInterface> extends BaseTypeHandler<E> {
+    public SomeInterfaceTypeHandler(Type type) {
+      super();
+    }
+
     @Override
     public void setNonNullParameter(PreparedStatement ps, int i, E parameter, JdbcType jdbcType) throws SQLException {
     }
@@ -203,7 +213,8 @@ class TypeHandlerRegistryTest {
   @Test
   void demoTypeHandlerForSuperInterface() {
     typeHandlerRegistry.register(SomeInterfaceTypeHandler.class);
-    assertNull(typeHandlerRegistry.getTypeHandler(SomeClass.class), "Registering interface works only for enums.");
+    // Since 3.6.x, registering type handler against super interface works for non-enum classes as well.
+    assertSame(SomeInterfaceTypeHandler.class, typeHandlerRegistry.getTypeHandler(SomeClass.class).getClass());
     assertSame(EnumTypeHandler.class, typeHandlerRegistry.getTypeHandler(NoTypeHandlerInterfaceEnum.class).getClass(),
         "When type handler for interface is not exist, apply default enum type handler.");
     assertSame(SomeInterfaceTypeHandler.class, typeHandlerRegistry.getTypeHandler(SomeEnum.class).getClass());
@@ -222,28 +233,114 @@ class TypeHandlerRegistryTest {
   }
 
   enum TestEnum {
-    ONE,
-    TWO
+    ONE, TWO
   }
 
   @Test
-  void shouldAutoRegisterEnutmTypeInMultiThreadEnvironment() throws Exception {
+  void shouldAutoRegisterEnumTypeInMultiThreadEnvironment() throws Exception {
     // gh-1820
     ExecutorService executorService = Executors.newCachedThreadPool();
     try {
       for (int iteration = 0; iteration < 2000; iteration++) {
         TypeHandlerRegistry typeHandlerRegistry = new TypeHandlerRegistry();
         List<Future<Boolean>> taskResults = IntStream.range(0, 2)
-            .mapToObj(taskIndex -> executorService.submit(() -> {
-              return typeHandlerRegistry.hasTypeHandler(TestEnum.class, JdbcType.VARCHAR);
-            })).collect(Collectors.toList());
-        for (int i = 0; i < taskResults.size(); i++) {
-          Future<Boolean> future = taskResults.get(i);
+            .mapToObj(taskIndex -> executorService
+                .submit(() -> typeHandlerRegistry.hasTypeHandler(TestEnum.class, JdbcType.VARCHAR)))
+            .collect(Collectors.toList());
+        for (Future<Boolean> future : taskResults) {
           assertTrue(future.get(), "false is returned at round " + iteration);
         }
       }
     } finally {
       executorService.shutdownNow();
     }
+  }
+
+  /**
+   * Enum with an abstract method, causing each constant to produce a subclass.
+   * <p>
+   * In Java, those subclasses report isAnonymousClass() == true.
+   * <p>
+   * In Kotlin the equivalent reports isAnonymousClass() == false
+   * <p>
+   * but isEnum() == false, which is the case this fix targets.
+   */
+  enum EnumWithAbstractMethod {
+    CONSTANT_A {
+      @Override
+      public String value() {
+        return "a";
+      }
+    },
+    CONSTANT_B {
+      @Override
+      public String value() {
+        return "b";
+      }
+    };
+
+    public abstract String value();
+  }
+
+  @Test
+  void shouldResolveTypeHandlerForEnumConstantWithAbstractBody() {
+    // CONSTANT_A.getClass() is a subclass of EnumWithAbstractMethod.
+    // isAnonymousClass() == true in Java; the Kotlin equivalent returns false but isEnum() == false.
+    // Both cases must resolve to the handler registered for the base enum type.
+    Class<?> constantClass = EnumWithAbstractMethod.CONSTANT_A.getClass();
+    assertFalse(constantClass.isEnum(), "Enum constant with anonymous body should not report isEnum() == true");
+
+    TypeHandler<?> handler = typeHandlerRegistry.getTypeHandler(constantClass, JdbcType.VARCHAR);
+    assertSame(EnumTypeHandler.class, handler.getClass(),
+        "TypeHandler for enum constant with abstract body must resolve to the base enum handler");
+  }
+
+  public static class TestHandlerBase<E> implements TypeHandler<E> {
+    // @formatter:off
+    public void setParameter(PreparedStatement ps, int i, E parameter, JdbcType jdbcType) throws SQLException {}
+    public E getResult(ResultSet rs, String columnName) throws SQLException {return null;}
+    public E getResult(ResultSet rs, int columnIndex) throws SQLException { return null; }
+    public E getResult(CallableStatement cs, int columnIndex) throws SQLException { return null; }
+    // @formatter:on
+  }
+
+  public static class TypeTestTypeHandler extends TestHandlerBase<Object> {
+    // @formatter:off
+    private final Type type;
+    public TypeTestTypeHandler(Type type) { super(); this.type = type; }
+    public Type getType() { return type; }
+    // @formatter:on
+  }
+
+  @Test
+  void shouldSmartHandlerMatchSameParameterizedType() throws Exception {
+    TypeHandlerRegistry registry = new TypeHandlerRegistry();
+    registry.register(new TypeReference<List<Integer>>() {
+    }.getRawType(), TypeTestTypeHandler.class);
+    TypeHandler<?> result = registry.getTypeHandler(new TypeReference<List<Integer>>() {
+    }.getRawType(), JdbcType.INTEGER);
+    assertTrue(result instanceof TypeTestTypeHandler);
+    TypeTestTypeHandler handler = (TypeTestTypeHandler) result;
+    Type type = handler.getType();
+    assertTrue(type instanceof ParameterizedType);
+    ParameterizedType parameterizedType = (ParameterizedType) type;
+    assertEquals(List.class, parameterizedType.getRawType());
+    assertEquals(Integer.class, parameterizedType.getActualTypeArguments()[0]);
+  }
+
+  @Test
+  void shouldSmartHandlerMatchSameRawType() throws Exception {
+    TypeHandlerRegistry registry = new TypeHandlerRegistry();
+    registry.register(new TypeReference<List<String>>() {
+    }.getRawType(), TypeTestTypeHandler.class);
+    TypeHandler<?> result = registry.getTypeHandler(new TypeReference<List<Integer>>() {
+    }.getRawType(), JdbcType.INTEGER);
+    assertTrue(result instanceof TypeTestTypeHandler);
+    TypeTestTypeHandler handler = (TypeTestTypeHandler) result;
+    Type type = handler.getType();
+    assertTrue(type instanceof ParameterizedType);
+    ParameterizedType parameterizedType = (ParameterizedType) type;
+    assertEquals(List.class, parameterizedType.getRawType());
+    assertEquals(Integer.class, parameterizedType.getActualTypeArguments()[0]);
   }
 }

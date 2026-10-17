@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2020 the original author or authors.
+/*
+ *    Copyright 2009-2024 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,7 +41,7 @@ class CommonPropertyLazyLoadTest {
   }
 
   @Test
-  void testLazyLoadWithNoAncestor() {
+  void lazyLoadWithNoAncestor() {
     try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
       ChildMapper childMapper = sqlSession.getMapper(ChildMapper.class);
 
@@ -50,7 +50,7 @@ class CommonPropertyLazyLoadTest {
   }
 
   @Test
-  void testLazyLoadWithFirstAncestor() {
+  void lazyLoadWithFirstAncestor() {
     try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
       FatherMapper fatherMapper = sqlSession.getMapper(FatherMapper.class);
       ChildMapper childMapper = sqlSession.getMapper(ChildMapper.class);
@@ -61,7 +61,7 @@ class CommonPropertyLazyLoadTest {
   }
 
   @Test
-  void testLazyLoadWithAllAncestors() {
+  void lazyLoadWithAllAncestors() {
     try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
       GrandFatherMapper grandFatherMapper = sqlSession.getMapper(GrandFatherMapper.class);
       FatherMapper fatherMapper = sqlSession.getMapper(FatherMapper.class);
@@ -74,7 +74,7 @@ class CommonPropertyLazyLoadTest {
   }
 
   @Test
-  void testLazyLoadSkipFirstAncestor() {
+  void lazyLoadSkipFirstAncestor() {
     try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
       GrandFatherMapper grandFatherMapper = sqlSession.getMapper(GrandFatherMapper.class);
       ChildMapper childMapper = sqlSession.getMapper(ChildMapper.class);

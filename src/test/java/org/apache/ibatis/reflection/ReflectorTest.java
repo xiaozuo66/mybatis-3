@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2020 the original author or authors.
+/*
+ *    Copyright 2009-2026 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,29 +15,46 @@
  */
 package org.apache.ibatis.reflection;
 
-import static com.googlecode.catchexception.apis.BDDCatchException.*;
+import static com.googlecode.catchexception.apis.BDDCatchException.caughtException;
+import static com.googlecode.catchexception.apis.BDDCatchException.when;
 import static org.assertj.core.api.BDDAssertions.then;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.Serializable;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map.Entry;
 
 import org.apache.ibatis.reflection.invoker.Invoker;
+import org.apache.ibatis.type.TypeReference;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class ReflectorTest {
 
   @Test
-  void testGetSetterType() {
+  void getSetterType() {
     ReflectorFactory reflectorFactory = new DefaultReflectorFactory();
     Reflector reflector = reflectorFactory.findForClass(Section.class);
     Assertions.assertEquals(Long.class, reflector.getSetterType("id"));
   }
 
   @Test
-  void testGetGetterType() {
+  void getSetterTypeThrowsReflectionExceptionForPropertyWithoutSetter() {
+    ReflectorFactory reflectorFactory = new DefaultReflectorFactory();
+    Reflector reflector = reflectorFactory.findForClass(Section.class);
+    // a property with no setter (here: an unknown one) must report a ReflectionException,
+    // consistent with getGetterType(); it previously threw a raw NullPointerException.
+    Assertions.assertThrows(ReflectionException.class, () -> reflector.getSetterType("nonexistentProperty"));
+  }
+
+  @Test
+  void getGetterType() {
     ReflectorFactory reflectorFactory = new DefaultReflectorFactory();
     Reflector reflector = reflectorFactory.findForClass(Section.class);
     Assertions.assertEquals(Long.class, reflector.getGetterType("id"));
@@ -50,13 +67,29 @@ class ReflectorTest {
     Assertions.assertFalse(reflector.hasGetter("class"));
   }
 
+  @Test
+  void shouldGetGenericGetterType() {
+    Type type = new TypeReference<Entity<List<String>>>() {
+    }.getRawType();
+    ReflectorFactory reflectorFactory = new DefaultReflectorFactory();
+    Reflector reflector = reflectorFactory.findForClass(type);
+    Assertions.assertTrue(reflector.hasGetter("id"));
+    Assertions.assertEquals(List.class, reflector.getGetterType("id"));
+    Entry<Type, Class<?>> entry = reflector.getGenericGetterType("id");
+    Assertions.assertEquals(List.class, entry.getValue());
+    Assertions.assertTrue(entry.getKey() instanceof ParameterizedType);
+    ParameterizedType parameterizedType = (ParameterizedType) entry.getKey();
+    Assertions.assertEquals(List.class, parameterizedType.getRawType());
+    Assertions.assertEquals(String.class, parameterizedType.getActualTypeArguments()[0]);
+  }
+
   interface Entity<T> {
     T getId();
 
     void setId(T id);
   }
 
-  static abstract class AbstractEntity implements Entity<Long> {
+  abstract static class AbstractEntity implements Entity<Long> {
 
     private Long id;
 
@@ -134,7 +167,7 @@ class ReflectorTest {
     assertEquals(String.class, clazz.getComponentType());
   }
 
-  static abstract class Parent<T extends Serializable> {
+  abstract static class Parent<T extends Serializable> {
     protected T id;
     protected List<T> list;
     protected T[] array;
@@ -174,7 +207,7 @@ class ReflectorTest {
   }
 
   @Test
-  void shouldResoleveReadonlySetterWithOverload() {
+  void shouldResolveReadonlySetterWithOverload() {
     class BeanClass implements BeanInterface<String> {
       @Override
       public void setId(String id) {
@@ -194,10 +227,17 @@ class ReflectorTest {
   void shouldSettersWithUnrelatedArgTypesThrowException() throws Exception {
     @SuppressWarnings("unused")
     class BeanClass {
-      public void setProp1(String arg) {}
-      public void setProp2(String arg) {}
-      public void setProp2(Integer arg) {}
-      public void setProp2(boolean arg) {}
+      public void setProp1(String arg) {
+      }
+
+      public void setProp2(String arg) {
+      }
+
+      public void setProp2(Integer arg) {
+      }
+
+      public void setProp2(boolean arg) {
+      }
     }
     ReflectorFactory reflectorFactory = new DefaultReflectorFactory();
     Reflector reflector = reflectorFactory.findForClass(BeanClass.class);
@@ -215,21 +255,29 @@ class ReflectorTest {
     assertTrue(String.class.equals(paramType) || Integer.class.equals(paramType) || boolean.class.equals(paramType));
 
     Invoker ambiguousInvoker = reflector.getSetInvoker("prop2");
-    Object[] param = String.class.equals(paramType)? new String[]{"x"} : new Integer[]{1};
+    Object[] param = String.class.equals(paramType) ? new String[] { "x" } : new Integer[] { 1 };
     when(() -> ambiguousInvoker.invoke(new BeanClass(), param));
     then(caughtException()).isInstanceOf(ReflectionException.class)
-        .hasMessageMatching(
-            "Ambiguous setters defined for property 'prop2' in class '" + BeanClass.class.getName().replace("$", "\\$")
-                + "' with types '(java.lang.String|java.lang.Integer|boolean)' and '(java.lang.String|java.lang.Integer|boolean)'\\.");
+        .hasMessageMatching("Ambiguous setters defined for property 'prop2' in class '"
+            + BeanClass.class.getName().replace("$", "\\$")
+            + "' with types '(java.lang.String|java.lang.Integer|boolean)' and '(java.lang.String|java.lang.Integer|boolean)'\\.");
   }
 
   @Test
   void shouldTwoGettersForNonBooleanPropertyThrowException() throws Exception {
     @SuppressWarnings("unused")
     class BeanClass {
-      public Integer getProp1() {return 1;}
-      public int getProp2() {return 0;}
-      public int isProp2() {return 0;}
+      public Integer getProp1() {
+        return 1;
+      }
+
+      public int getProp2() {
+        return 0;
+      }
+
+      public int isProp2() {
+        return 0;
+      }
     }
     ReflectorFactory reflectorFactory = new DefaultReflectorFactory();
     Reflector reflector = reflectorFactory.findForClass(BeanClass.class);
@@ -248,7 +296,7 @@ class ReflectorTest {
     assertEquals(int.class, paramType);
 
     Invoker ambiguousInvoker = reflector.getGetInvoker("prop2");
-    when(() -> ambiguousInvoker.invoke(new BeanClass(), new Integer[] {1}));
+    when(() -> ambiguousInvoker.invoke(new BeanClass(), new Integer[] { 1 }));
     then(caughtException()).isInstanceOf(ReflectionException.class)
         .hasMessageContaining("Illegal overloaded getter method with ambiguous type for property 'prop2' in class '"
             + BeanClass.class.getName()
@@ -259,9 +307,17 @@ class ReflectorTest {
   void shouldTwoGettersWithDifferentTypesThrowException() throws Exception {
     @SuppressWarnings("unused")
     class BeanClass {
-      public Integer getProp1() {return 1;}
-      public Integer getProp2() {return 1;}
-      public boolean isProp2() {return false;}
+      public Integer getProp1() {
+        return 1;
+      }
+
+      public Integer getProp2() {
+        return 1;
+      }
+
+      public boolean isProp2() {
+        return false;
+      }
     }
     ReflectorFactory reflectorFactory = new DefaultReflectorFactory();
     Reflector reflector = reflectorFactory.findForClass(BeanClass.class);
@@ -292,23 +348,39 @@ class ReflectorTest {
     @SuppressWarnings("unused")
     class Bean {
       // JavaBean Spec allows this (see #906)
-      public boolean isBool() {return true;}
-      public boolean getBool() {return false;}
-      public void setBool(boolean bool) {}
+      public boolean isBool() {
+        return true;
+      }
+
+      public boolean getBool() {
+        return false;
+      }
+
+      public void setBool(boolean bool) {
+      }
     }
     ReflectorFactory reflectorFactory = new DefaultReflectorFactory();
     Reflector reflector = reflectorFactory.findForClass(Bean.class);
-    assertTrue((Boolean)reflector.getGetInvoker("bool").invoke(new Bean(), new Byte[0]));
+    assertTrue((Boolean) reflector.getGetInvoker("bool").invoke(new Bean(), new Byte[0]));
   }
 
   @Test
   void shouldIgnoreBestMatchSetterIfGetterIsAmbiguous() throws Exception {
     @SuppressWarnings("unused")
     class Bean {
-      public Integer isBool() {return Integer.valueOf(1);}
-      public Integer getBool() {return Integer.valueOf(2);}
-      public void setBool(boolean bool) {}
-      public void setBool(Integer bool) {}
+      public Integer isBool() {
+        return Integer.valueOf(1);
+      }
+
+      public Integer getBool() {
+        return Integer.valueOf(2);
+      }
+
+      public void setBool(boolean bool) {
+      }
+
+      public void setBool(Integer bool) {
+      }
     }
     ReflectorFactory reflectorFactory = new DefaultReflectorFactory();
     Reflector reflector = reflectorFactory.findForClass(Bean.class);
@@ -316,9 +388,31 @@ class ReflectorTest {
     Object[] param = boolean.class.equals(paramType) ? new Boolean[] { true } : new Integer[] { 1 };
     Invoker ambiguousInvoker = reflector.getSetInvoker("bool");
     when(() -> ambiguousInvoker.invoke(new Bean(), param));
-    then(caughtException()).isInstanceOf(ReflectionException.class)
-        .hasMessageMatching(
-            "Ambiguous setters defined for property 'bool' in class '" + Bean.class.getName().replace("$", "\\$")
-                + "' with types '(java.lang.Integer|boolean)' and '(java.lang.Integer|boolean)'\\.");
+    then(caughtException()).isInstanceOf(ReflectionException.class).hasMessageMatching(
+        "Ambiguous setters defined for property 'bool' in class '" + Bean.class.getName().replace("$", "\\$")
+            + "' with types '(java.lang.Integer|boolean)' and '(java.lang.Integer|boolean)'\\.");
+  }
+
+  @Test
+  void shouldGetGenericGetter() throws Exception {
+    class Foo<T> {
+    }
+    @SuppressWarnings("unused")
+    class Bean {
+      public void setFoo(Foo<String> foo) {
+      }
+
+      public Foo<String> getFoo() {
+        return null;
+      }
+    }
+    ReflectorFactory reflectorFactory = new DefaultReflectorFactory();
+    Reflector reflector = reflectorFactory.findForClass(Bean.class);
+    ParameterizedType getter = (ParameterizedType) reflector.getGenericGetterType("foo").getKey();
+    assertEquals(Foo.class, getter.getRawType());
+    assertArrayEquals(new Type[] { String.class }, getter.getActualTypeArguments());
+    ParameterizedType setter = (ParameterizedType) reflector.getGenericSetterType("foo").getKey();
+    assertEquals(Foo.class, setter.getRawType());
+    assertArrayEquals(new Type[] { String.class }, setter.getActualTypeArguments());
   }
 }

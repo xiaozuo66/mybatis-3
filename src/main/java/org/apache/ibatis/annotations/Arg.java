@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2019 the original author or authors.
+/*
+ *    Copyright 2009-2025 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,6 +30,7 @@ import org.apache.ibatis.type.UnknownTypeHandler;
  * The annotation that specify a mapping definition for the constructor argument.
  *
  * @see ConstructorArgs
+ *
  * @author Clinton Begin
  */
 @Documented
@@ -74,14 +75,14 @@ public @interface Arg {
   Class<? extends TypeHandler> typeHandler() default UnknownTypeHandler.class;
 
   /**
-   * Return the statement id for retrieving a object that map to this argument.
+   * Return the statement id for retrieving an object that map to this argument.
    *
    * @return the statement id
    */
   String select() default "";
 
   /**
-   * Returns the result map id for mapping to a object that map to this argument.
+   * Returns the result map id for mapping to an object that map to this argument.
    *
    * @return the result map id
    */
@@ -91,6 +92,7 @@ public @interface Arg {
    * Returns the parameter name for applying this mapping.
    *
    * @return the parameter name
+   *
    * @since 3.4.3
    */
   String name() default "";
@@ -99,6 +101,7 @@ public @interface Arg {
    * Returns the column prefix that use when applying {@link #resultMap()}.
    *
    * @return the column prefix
+   *
    * @since 3.5.0
    */
   String columnPrefix() default "";

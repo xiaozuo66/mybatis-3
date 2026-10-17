@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2020 the original author or authors.
+/*
+ *    Copyright 2009-2025 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,12 +15,13 @@
  */
 package org.apache.ibatis.submitted.maptypehandler;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import java.io.Reader;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.ibatis.BaseDataTest;
-import org.apache.ibatis.exceptions.PersistenceException;
 import org.apache.ibatis.io.Resources;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -31,7 +32,6 @@ import org.junit.jupiter.api.Test;
 
 /**
  * See issue #135
- *
  */
 class MapTypeHandlerTest {
 
@@ -60,13 +60,14 @@ class MapTypeHandlerTest {
   }
 
   @Test
-  void shouldGetAUserFromXML() {
+  void shouldNotUseMapTypeHandlerEvenIfTheParamIsAMap() {
     try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
       Mapper mapper = sqlSession.getMapper(Mapper.class);
       Map<String, Object> params = new HashMap<>();
       params.put("id", 1);
       params.put("name", "User1");
-      Assertions.assertThrows(PersistenceException.class, () -> mapper.getUserXML(params));
+      User user = mapper.getUserXML(params);
+      assertThat(user).extracting(User::getId, User::getName).containsExactly(1, "User1");
     }
   }
 

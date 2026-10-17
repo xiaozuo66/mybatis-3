@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2020 the original author or authors.
+/*
+ *    Copyright 2009-2025 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,12 @@
  */
 package org.apache.ibatis.submitted.optional_on_mapper_method;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 
 import java.io.Reader;
 import java.util.Optional;
@@ -34,6 +38,7 @@ import org.mockito.Mockito;
  * Tests for support the {@code java.util.Optional} as return type of mapper method.
  *
  * @since 3.5.0
+ *
  * @author Kazuki Shimizu
  */
 class OptionalOnMapperMethodTest {
@@ -59,7 +64,7 @@ class OptionalOnMapperMethodTest {
       Mapper mapper = sqlSession.getMapper(Mapper.class);
       Optional<User> user = mapper.getUserUsingAnnotation(1);
       assertTrue(user.isPresent());
-      assertEquals("User1", user.get().getName());
+      assertEquals("User1", user.orElseThrow().getName());
     }
   }
 
@@ -78,7 +83,7 @@ class OptionalOnMapperMethodTest {
       Mapper mapper = sqlSession.getMapper(Mapper.class);
       Optional<User> user = mapper.getUserUsingXml(2);
       assertTrue(user.isPresent());
-      assertEquals("User2", user.get().getName());
+      assertEquals("User2", user.orElseThrow().getName());
     }
   }
 

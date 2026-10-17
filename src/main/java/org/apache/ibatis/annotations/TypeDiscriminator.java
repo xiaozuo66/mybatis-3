@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2020 the original author or authors.
+/*
+ *    Copyright 2009-2025 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,25 +27,18 @@ import org.apache.ibatis.type.UnknownTypeHandler;
 
 /**
  * The annotation that be grouping conditional mapping definitions.
- *
  * <p>
  * <b>How to use:</b>
  *
- * <pre>
+ * <pre>{@code
  * public interface UserMapper {
  *   &#064;Select("SELECT id, name, type FROM users ORDER BY id")
- *   &#064;TypeDiscriminator(
- *     column = "type",
- *     javaType = String.class,
- *     cases = {
- *       &#064;Case(value = "1", type = PremiumUser.class),
- *       &#064;Case(value = "2", type = GeneralUser.class),
- *       &#064;Case(value = "3", type = TemporaryUser.class)
- *     }
- *   )
+ *   &#064;TypeDiscriminator(column = "type", javaType = String.class, cases = {
+ *       &#064;Case(value = "1", type = PremiumUser.class), &#064;Case(value = "2", type = GeneralUser.class),
+ *       &#064;Case(value = "3", type = TemporaryUser.class) })
  *   List&lt;User&gt; selectAll();
  * }
- * </pre>
+ * }</pre>
  *
  * @author Clinton Begin
  */

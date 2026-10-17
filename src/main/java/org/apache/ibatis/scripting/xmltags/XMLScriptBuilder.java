@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2019 the original author or authors.
+/*
+ *    Copyright 2009-2025 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,11 +19,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.ibatis.builder.BaseBuilder;
 import org.apache.ibatis.builder.BuilderException;
 import org.apache.ibatis.mapping.SqlSource;
 import org.apache.ibatis.parsing.XNode;
+import org.apache.ibatis.reflection.ParamNameResolver;
 import org.apache.ibatis.scripting.defaults.RawSqlSource;
 import org.apache.ibatis.session.Configuration;
 import org.w3c.dom.Node;
@@ -37,19 +39,26 @@ public class XMLScriptBuilder extends BaseBuilder {
   private final XNode context;
   private boolean isDynamic;
   private final Class<?> parameterType;
+  private final ParamNameResolver paramNameResolver;
   private final Map<String, NodeHandler> nodeHandlerMap = new HashMap<>();
+  private static final Map<String, SqlNode> emptyNodeCache = new ConcurrentHashMap<>();
 
   public XMLScriptBuilder(Configuration configuration, XNode context) {
     this(configuration, context, null);
   }
 
   public XMLScriptBuilder(Configuration configuration, XNode context, Class<?> parameterType) {
+    this(configuration, context, parameterType, null);
+  }
+
+  public XMLScriptBuilder(Configuration configuration, XNode context, Class<?> parameterType,
+      ParamNameResolver paramNameResolver) {
     super(configuration);
     this.context = context;
     this.parameterType = parameterType;
+    this.paramNameResolver = paramNameResolver;
     initNodeHandlerMap();
   }
-
 
   private void initNodeHandlerMap() {
     nodeHandlerMap.put("trim", new TrimHandler());
@@ -69,7 +78,7 @@ public class XMLScriptBuilder extends BaseBuilder {
     if (isDynamic) {
       sqlSource = new DynamicSqlSource(configuration, rootSqlNode);
     } else {
-      sqlSource = new RawSqlSource(configuration, rootSqlNode, parameterType);
+      sqlSource = new RawSqlSource(configuration, rootSqlNode, parameterType, paramNameResolver);
     }
     return sqlSource;
   }
@@ -81,6 +90,10 @@ public class XMLScriptBuilder extends BaseBuilder {
       XNode child = node.newXNode(children.item(i));
       if (child.getNode().getNodeType() == Node.CDATA_SECTION_NODE || child.getNode().getNodeType() == Node.TEXT_NODE) {
         String data = child.getStringBody("");
+        if (data.trim().isEmpty()) {
+          contents.add(emptyNodeCache.computeIfAbsent(data, EmptySqlNode::new));
+          continue;
+        }
         TextSqlNode textSqlNode = new TextSqlNode(data);
         if (textSqlNode.isDynamic()) {
           contents.add(textSqlNode);
@@ -105,7 +118,7 @@ public class XMLScriptBuilder extends BaseBuilder {
     void handleNode(XNode nodeToHandle, List<SqlNode> targetContents);
   }
 
-  private class BindHandler implements NodeHandler {
+  private static class BindHandler implements NodeHandler {
     public BindHandler() {
       // Prevent Synthetic Access
     }
@@ -171,12 +184,14 @@ public class XMLScriptBuilder extends BaseBuilder {
     public void handleNode(XNode nodeToHandle, List<SqlNode> targetContents) {
       MixedSqlNode mixedSqlNode = parseDynamicTags(nodeToHandle);
       String collection = nodeToHandle.getStringAttribute("collection");
+      Boolean nullable = nodeToHandle.getBooleanAttribute("nullable");
       String item = nodeToHandle.getStringAttribute("item");
       String index = nodeToHandle.getStringAttribute("index");
       String open = nodeToHandle.getStringAttribute("open");
       String close = nodeToHandle.getStringAttribute("close");
       String separator = nodeToHandle.getStringAttribute("separator");
-      ForEachSqlNode forEachSqlNode = new ForEachSqlNode(configuration, mixedSqlNode, collection, index, item, open, close, separator);
+      ForEachSqlNode forEachSqlNode = new ForEachSqlNode(configuration, mixedSqlNode, collection, nullable, index, item,
+          open, close, separator);
       targetContents.add(forEachSqlNode);
     }
   }
@@ -222,7 +237,8 @@ public class XMLScriptBuilder extends BaseBuilder {
       targetContents.add(chooseSqlNode);
     }
 
-    private void handleWhenOtherwiseNodes(XNode chooseSqlNode, List<SqlNode> ifSqlNodes, List<SqlNode> defaultSqlNodes) {
+    private void handleWhenOtherwiseNodes(XNode chooseSqlNode, List<SqlNode> ifSqlNodes,
+        List<SqlNode> defaultSqlNodes) {
       List<XNode> children = chooseSqlNode.getChildren();
       for (XNode child : children) {
         String nodeName = child.getNode().getNodeName();
@@ -231,6 +247,8 @@ public class XMLScriptBuilder extends BaseBuilder {
           handler.handleNode(child, ifSqlNodes);
         } else if (handler instanceof OtherwiseHandler) {
           handler.handleNode(child, defaultSqlNodes);
+        } else {
+          throw new BuilderException("Unknown element <" + nodeName + "> in SQL statement.");
         }
       }
     }
@@ -246,4 +264,18 @@ public class XMLScriptBuilder extends BaseBuilder {
     }
   }
 
+  private static class EmptySqlNode implements SqlNode {
+    private final String whitespaces;
+
+    public EmptySqlNode(String whitespaces) {
+      super();
+      this.whitespaces = whitespaces;
+    }
+
+    @Override
+    public boolean apply(DynamicContext context) {
+      context.appendSql(whitespaces);
+      return true;
+    }
+  }
 }

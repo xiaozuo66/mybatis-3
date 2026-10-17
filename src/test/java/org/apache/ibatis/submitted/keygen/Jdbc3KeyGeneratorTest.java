@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2020 the original author or authors.
+/*
+ *    Copyright 2009-2026 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +15,11 @@
  */
 package org.apache.ibatis.submitted.keygen;
 
-import static com.googlecode.catchexception.apis.BDDCatchException.*;
+import static com.googlecode.catchexception.apis.BDDCatchException.caughtException;
+import static com.googlecode.catchexception.apis.BDDCatchException.when;
 import static org.assertj.core.api.BDDAssertions.then;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.Reader;
 import java.util.ArrayList;
@@ -195,7 +197,7 @@ class Jdbc3KeyGeneratorTest {
   }
 
   @Test
-  void shouldAssingKeysToCollection() {
+  void shouldAssignKeysToCollection() {
     try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
       try {
         CountryMapper mapper = sqlSession.getMapper(CountryMapper.class);
@@ -213,7 +215,7 @@ class Jdbc3KeyGeneratorTest {
   }
 
   @Test
-  void shouldAssingKeysToNamedCollection() {
+  void shouldAssignKeysToNamedCollection() {
     try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
       try {
         CountryMapper mapper = sqlSession.getMapper(CountryMapper.class);
@@ -231,7 +233,7 @@ class Jdbc3KeyGeneratorTest {
   }
 
   @Test
-  void shouldAssingKeysToArray() {
+  void shouldAssignKeysToArray() {
     try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
       try {
         CountryMapper mapper = sqlSession.getMapper(CountryMapper.class);
@@ -249,7 +251,7 @@ class Jdbc3KeyGeneratorTest {
   }
 
   @Test
-  void shouldAssingKeysToNamedArray() {
+  void shouldAssignKeysToNamedArray() {
     try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
       try {
         CountryMapper mapper = sqlSession.getMapper(CountryMapper.class);
@@ -287,10 +289,11 @@ class Jdbc3KeyGeneratorTest {
         CountryMapper mapper = sqlSession.getMapper(CountryMapper.class);
         Country country = new Country("China", "CN");
         when(() -> mapper.insertMultiParams_keyPropertyWithoutParamName(country, 1));
-        then(caughtException()).isInstanceOf(PersistenceException.class)
-            .hasMessageContaining("Could not determine which parameter to assign generated keys to. "
-                + "Note that when there are multiple parameters, 'keyProperty' must include the parameter name (e.g. 'param.id'). "
-                + "Specified key properties are [id] and available parameters are [");
+        then(caughtException()).isInstanceOf(PersistenceException.class).hasMessageContaining(
+            """
+                Could not determine which parameter to assign generated keys to. \
+                Note that when there are multiple parameters, 'keyProperty' must include the parameter name (e.g. 'param.id'). \
+                Specified key properties are [id] and available parameters are [""");
       } finally {
         sqlSession.rollback();
       }
@@ -304,10 +307,11 @@ class Jdbc3KeyGeneratorTest {
         CountryMapper mapper = sqlSession.getMapper(CountryMapper.class);
         Country country = new Country("China", "CN");
         when(() -> mapper.insertMultiParams_keyPropertyWithWrongParamName(country, 1));
-        then(caughtException()).isInstanceOf(PersistenceException.class)
-            .hasMessageContaining("Could not find parameter 'bogus'. "
-                + "Note that when there are multiple parameters, 'keyProperty' must include the parameter name (e.g. 'param.id'). "
-                + "Specified key properties are [bogus.id] and available parameters are [");
+        then(caughtException()).isInstanceOf(PersistenceException.class).hasMessageContaining(
+            """
+                Could not find parameter 'bogus'. \
+                Note that when there are multiple parameters, 'keyProperty' must include the parameter name (e.g. 'param.id'). \
+                Specified key properties are [bogus.id] and available parameters are [""");
       } finally {
         sqlSession.rollback();
       }
@@ -559,6 +563,28 @@ class Jdbc3KeyGeneratorTest {
   }
 
   @Test
+  void shouldFailWithClearMessageWhenMapParameterHoldsTargetList() {
+    // gh-3536 : passing a Map that holds the target list under a key (e.g. "list") is no longer
+    // supported (gh-1249). The user should get an actionable message instead of the misleading
+    // "wrong 'keyProperty' or driver bug" one.
+    try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
+      try {
+        CountryMapper mapper = sqlSession.getMapper(CountryMapper.class);
+        Map<String, Object> map = new HashMap<>();
+        List<Country> countries = new ArrayList<>();
+        countries.add(new Country("China", "CN"));
+        countries.add(new Country("Canada", "CA"));
+        map.put("list", countries);
+        when(() -> mapper.insertListUsingMapParameter(map));
+        then(caughtException()).isInstanceOf(PersistenceException.class).hasMessageContaining("Map")
+            .hasMessageContaining("@Param");
+      } finally {
+        sqlSession.rollback();
+      }
+    }
+  }
+
+  @Test
   void shouldAssignKeysToListWithoutInvokingEqualsNorHashCode() {
     // gh-1719
     try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
@@ -593,7 +619,7 @@ class Jdbc3KeyGeneratorTest {
   }
 
   @Test
-  void shouldAssingKeysToAMap() {
+  void shouldAssignKeysToAMap() {
     try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
       try {
         CountryMapper mapper = sqlSession.getMapper(CountryMapper.class);

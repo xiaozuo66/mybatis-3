@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2020 the original author or authors.
+/*
+ *    Copyright 2009-2024 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,6 +14,8 @@
  *    limitations under the License.
  */
 package org.apache.ibatis.submitted.xml_references;
+
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 import java.io.Reader;
 import java.util.Properties;
@@ -31,7 +33,7 @@ import org.junit.jupiter.api.Test;
 class EnumWithOgnlTest {
 
   @Test
-  void testConfiguration() {
+  void configuration() {
     UnpooledDataSourceFactory dataSourceFactory = new UnpooledDataSourceFactory();
     Properties dataSourceProperties = new Properties();
     dataSourceProperties.put("driver", "org.hsqldb.jdbcDriver");
@@ -48,10 +50,13 @@ class EnumWithOgnlTest {
   }
 
   @Test
-  void testMixedConfiguration() throws Exception {
-    try (Reader reader = Resources.getResourceAsReader("org/apache/ibatis/submitted/xml_references/ibatisConfig.xml")) {
-      SqlSessionFactory sqlSessionFactory = new SqlSessionFactoryBuilder().build(reader);
-      sqlSessionFactory.getConfiguration().addMapper(PersonMapper2.class);
-    }
+  void mixedConfiguration() {
+    assertDoesNotThrow(() -> {
+      try (Reader reader = Resources
+          .getResourceAsReader("org/apache/ibatis/submitted/xml_references/ibatisConfig.xml")) {
+        SqlSessionFactory sqlSessionFactory = new SqlSessionFactoryBuilder().build(reader);
+        sqlSessionFactory.getConfiguration().addMapper(PersonMapper2.class);
+      }
+    });
   }
 }

@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2020 the original author or authors.
+/*
+ *    Copyright 2009-2024 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,6 +26,7 @@ import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.apache.ibatis.submitted.ognl_enum.Person.Type;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 class EnumWithOgnlTest {
@@ -43,7 +44,7 @@ class EnumWithOgnlTest {
   }
 
   @Test
-  void testEnumWithOgnl() {
+  void enumWithOgnl() {
     try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
       PersonMapper personMapper = sqlSession.getMapper(PersonMapper.class);
       List<Person> persons = personMapper.selectAllByType(null);
@@ -52,7 +53,7 @@ class EnumWithOgnlTest {
   }
 
   @Test
-  void testEnumWithOgnlDirector() {
+  void enumWithOgnlDirector() {
     try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
       PersonMapper personMapper = sqlSession.getMapper(PersonMapper.class);
       List<Person> persons = personMapper.selectAllByType(Person.Type.DIRECTOR);
@@ -60,8 +61,9 @@ class EnumWithOgnlTest {
     }
   }
 
+  @Tag("RequireIllegalAccess")
   @Test
-  void testEnumWithOgnlDirectorNameAttribute() {
+  void enumWithOgnlDirectorNameAttribute() {
     try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
       PersonMapper personMapper = sqlSession.getMapper(PersonMapper.class);
       List<Person> persons = personMapper.selectAllByTypeNameAttribute(Person.Type.DIRECTOR);
@@ -70,7 +72,7 @@ class EnumWithOgnlTest {
   }
 
   @Test
-  void testEnumWithOgnlDirectorWithInterface() {
+  void enumWithOgnlDirectorWithInterface() {
     try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
       PersonMapper personMapper = sqlSession.getMapper(PersonMapper.class);
       List<Person> persons = personMapper.selectAllByTypeWithInterface(() -> Type.DIRECTOR);
@@ -79,7 +81,7 @@ class EnumWithOgnlTest {
   }
 
   @Test
-  void testEnumWithOgnlDirectorNameAttributeWithInterface() {
+  void enumWithOgnlDirectorNameAttributeWithInterface() {
     try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
       PersonMapper personMapper = sqlSession.getMapper(PersonMapper.class);
       List<Person> persons = personMapper.selectAllByTypeNameAttributeWithInterface(() -> Type.DIRECTOR);
